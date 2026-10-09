@@ -165,6 +165,25 @@ setup_vlc() {
   apt_install vlc
 }
 
+setup_nomachine() {
+  log "NoMachine remote desktop"
+  if dpkg -s nomachine >/dev/null 2>&1; then
+    return
+  fi
+  if [[ $ARCH != amd64 ]]; then
+    warn "NoMachine package URL is set for amd64 only (this system is $ARCH); skipping."
+    return
+  fi
+  local url=${NOMACHINE_URL:-https://download.nomachine.com/download/9.2/Linux/nomachine_9.2.18_3_amd64.deb}
+  local deb=/tmp/nomachine.deb
+  if ! curl -fsSL -o "$deb" "$url"; then
+    warn "Could not download NoMachine from $url; set NOMACHINE_URL to the current .deb."
+    return
+  fi
+  apt_install "$deb"
+  rm -f "$deb"
+}
+
 setup_nvtop() {
   log "nvtop"
   if ! apt-cache show nvtop >/dev/null 2>&1; then
@@ -183,6 +202,22 @@ setup_projects_dir() {
   install -d -m 0755 -o "$TARGET_USER" -g "$(id -gn "$TARGET_USER")" "$home/Projects"
 }
 
+setup_new_file_menu() {
+  log "Right-click 'Empty File' template"
+  local home group
+  home=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+  group=$(id -gn "$TARGET_USER")
+  install -d -m 0755 -o "$TARGET_USER" -g "$group" "$home/Templates"
+  if [[ ! -e $home/Templates/Empty File ]]; then
+    install -m 0644 -o "$TARGET_USER" -g "$group" /dev/null "$home/Templates/Empty File"
+  fi
+}
+
+setup_system_settings() {
+  log "System settings (sleep disabled)"
+  bash "$SCRIPT_DIR/update-system-settings.sh"
+}
+
 setup_stack() {
   log "Media stack (Docker Compose)"
   bash "$SCRIPT_DIR/setup-docker.sh"
@@ -190,7 +225,7 @@ setup_stack() {
 
 preflight() {
   local f
-  for f in setup-python.sh setup-docker.sh docker-compose.yml; do
+  for f in setup-python.sh setup-docker.sh update-system-settings.sh docker-compose.yml; do
     [[ -f $SCRIPT_DIR/$f ]] || die "Missing $f in $SCRIPT_DIR"
   done
 }
@@ -202,6 +237,7 @@ main() {
   install -d -m 0755 /etc/apt/keyrings
 
   setup_projects_dir
+  setup_new_file_menu
   setup_ssh
   setup_docker
   setup_chrome
@@ -210,6 +246,7 @@ main() {
   setup_python
   setup_nodejs
   setup_vlc
+  setup_nomachine
 
   if has_nvidia_gpu; then
     setup_nvtop
@@ -217,6 +254,7 @@ main() {
     log "No NVIDIA GPU detected; skipping nvtop"
   fi
 
+  setup_system_settings
   setup_stack
 
   log "Setup complete on Ubuntu $VERSION_ID"
