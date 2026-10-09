@@ -60,6 +60,14 @@ has_nvidia_gpu() {
   return 1
 }
 
+has_intel_gpu() {
+  local d
+  for d in /sys/bus/pci/devices/*; do
+    [[ $(<"$d/vendor") == 0x8086 && $(<"$d/class") == 0x03* ]] && return 0
+  done
+  return 1
+}
+
 setup_ssh() {
   log "OpenSSH server"
   apt_install openssh-server
@@ -141,6 +149,41 @@ setup_vscode_extensions() {
       sudo -H -u "$TARGET_USER" code --install-extension "$ext"
     fi
   done
+}
+
+setup_intel_gpu() {
+  if ! has_intel_gpu; then
+    log "No Intel GPU detected; skipping Intel GPU and OpenVINO setup"
+    return
+  fi
+
+  log "Intel GPU compute runtime"
+  local pkg grp
+  for pkg in intel-opencl-icd libze-intel-gpu1 libze1 clinfo; do
+    if apt-cache show "$pkg" >/dev/null 2>&1; then
+      apt_install "$pkg"
+    else
+      warn "Package $pkg is not available on this release; skipping."
+    fi
+  done
+
+  if [[ $TARGET_USER != root ]]; then
+    for grp in render video; do
+      case " $(id -nG "$TARGET_USER") " in
+        *" $grp "*) ;;
+        *)
+          usermod -aG "$grp" "$TARGET_USER"
+          warn "Added $TARGET_USER to the $grp group; log out and back in to apply."
+          ;;
+      esac
+    done
+  fi
+
+  log "OpenVINO (virtualenv at /opt/openvino)"
+  apt_install python3-venv
+  [[ -x /opt/openvino/bin/python ]] || python3 -m venv /opt/openvino
+  /opt/openvino/bin/python -m pip show openvino >/dev/null 2>&1 \
+    || /opt/openvino/bin/python -m pip install openvino
 }
 
 setup_python() {
@@ -244,6 +287,7 @@ main() {
   setup_vscode
   setup_vscode_extensions
   setup_python
+  setup_intel_gpu
   setup_nodejs
   setup_vlc
   setup_nomachine
