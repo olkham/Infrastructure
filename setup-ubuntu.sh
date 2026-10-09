@@ -158,7 +158,7 @@ preflight() {
 main() {
   preflight
   log "Base prerequisites"
-  apt_install ca-certificates curl gnupg htop
+  apt_install ca-certificates curl git gnupg htop
   install -d -m 0755 /etc/apt/keyrings
 
   setup_ssh
