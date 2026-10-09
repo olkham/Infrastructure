@@ -1,0 +1,108 @@
+name: media-stack
+
+x-lsio-env: &lsio-env
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+  TZ: ${TZ:-Etc/UTC}
+
+services:
+  agentdvr:
+    image: ispysoftware/agentdvr:latest
+    container_name: agentdvr
+    network_mode: host
+    environment:
+      TZ: ${TZ:-Etc/UTC}
+    volumes:
+      - ${DATA_DIR:-./data}/agentdvr/config:/agent/Media/XML
+      - ${DATA_DIR:-./data}/agentdvr/media:/agent/Media/WebServerRoot/Media
+    restart: unless-stopped
+
+  node-red:
+    image: nodered/node-red:5.0
+    container_name: node-red
+    ports:
+      - "1880:1880"
+    environment:
+      TZ: ${TZ:-Etc/UTC}
+    volumes:
+      - ${DATA_DIR:-./data}/node-red:/data
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    configs:
+      - source: mosquitto_conf
+        target: /mosquitto/config/mosquitto.conf
+    volumes:
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    restart: unless-stopped
+
+  sabnzbd:
+    image: linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    environment: *lsio-env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${DATA_DIR:-./data}/sabnzbd:/config
+      - ${MEDIA_ROOT:-/srv/media}:/data
+    restart: unless-stopped
+
+  sonarr:
+    image: linuxserver/sonarr:latest
+    container_name: sonarr
+    environment: *lsio-env
+    ports:
+      - "8989:8989"
+    volumes:
+      - ${DATA_DIR:-./data}/sonarr:/config
+      - ${MEDIA_ROOT:-/srv/media}:/data
+    restart: unless-stopped
+
+  radarr:
+    image: linuxserver/radarr:latest
+    container_name: radarr
+    environment: *lsio-env
+    ports:
+      - "7878:7878"
+    volumes:
+      - ${DATA_DIR:-./data}/radarr:/config
+      - ${MEDIA_ROOT:-/srv/media}:/data
+    restart: unless-stopped
+
+  plex:
+    image: linuxserver/plex:latest
+    container_name: plex
+    network_mode: host
+    environment:
+      <<: *lsio-env
+      VERSION: docker
+      PLEX_CLAIM: ${PLEX_CLAIM:-}
+    volumes:
+      - ${DATA_DIR:-./data}/plex:/config
+      - ${MEDIA_ROOT:-/srv/media}:/data
+    restart: unless-stopped
+
+configs:
+  mosquitto_conf:
+    content: |
+      listener 1883
+      protocol mqtt
+      listener 9001
+      protocol websockets
+      # Anonymous access is open on the LAN; add a password_file before exposing these ports.
+      allow_anonymous true
+      persistence true
+      persistence_location /mosquitto/data/
+      log_dest stdout
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:
