@@ -251,7 +251,7 @@ setup_new_file_menu() {
   home=$(getent passwd "$TARGET_USER" | cut -d: -f6)
   group=$(id -gn "$TARGET_USER")
   install -d -m 0755 -o "$TARGET_USER" -g "$group" "$home/Templates"
-  if [[ ! -e $home/Templates/Empty File ]]; then
+  if [[ ! -e "$home/Templates/Empty File" ]]; then
     install -m 0644 -o "$TARGET_USER" -g "$group" /dev/null "$home/Templates/Empty File"
   fi
 }
