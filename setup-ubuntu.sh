@@ -102,12 +102,45 @@ setup_chrome() {
   apt_install google-chrome-stable
 }
 
+VSCODE_EXTENSIONS=(
+  ms-python.python
+  anthropic.claude-code
+  ms-vscode.cpptools
+  platformio.platformio-ide
+  mhutchie.git-graph
+  ms-vscode-remote.remote-ssh
+)
+
 setup_vscode() {
   log "Visual Studio Code"
   install_key https://packages.microsoft.com/keys/microsoft.asc /etc/apt/keyrings/microsoft.gpg
   write_if_changed /etc/apt/sources.list.d/vscode.list \
     "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main"
   apt_install code
+}
+
+setup_vscode_extensions() {
+  log "VS Code extensions"
+  if [[ $TARGET_USER == root ]]; then
+    warn "Run via sudo from a regular user to install VS Code extensions; skipping."
+    return
+  fi
+  if [[ ! -r /dev/tty ]]; then
+    warn "No terminal to ask on; skipping VS Code extensions."
+    return
+  fi
+  local answer installed ext
+  read -r -p "Install VS Code extensions (${VSCODE_EXTENSIONS[*]})? The IDs have not been verified against the Marketplace. [y/N] " answer < /dev/tty || answer=""
+  if [[ ${answer,,} != y && ${answer,,} != yes ]]; then
+    log "Skipping VS Code extensions"
+    return
+  fi
+  installed=$(sudo -H -u "$TARGET_USER" code --list-extensions 2>/dev/null || true)
+  for ext in "${VSCODE_EXTENSIONS[@]}"; do
+    if ! grep -qix "$ext" <<<"$installed"; then
+      sudo -H -u "$TARGET_USER" code --install-extension "$ext"
+    fi
+  done
 }
 
 setup_python() {
@@ -143,6 +176,13 @@ setup_nvtop() {
   command -v nvidia-smi >/dev/null || warn "NVIDIA driver not detected; install it with: sudo ubuntu-drivers install"
 }
 
+setup_projects_dir() {
+  log "Projects folder"
+  local home
+  home=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+  install -d -m 0755 -o "$TARGET_USER" -g "$(id -gn "$TARGET_USER")" "$home/Projects"
+}
+
 setup_stack() {
   log "Media stack (Docker Compose)"
   bash "$SCRIPT_DIR/setup-docker.sh"
@@ -161,10 +201,12 @@ main() {
   apt_install ca-certificates curl git gnupg htop lm-sensors net-tools
   install -d -m 0755 /etc/apt/keyrings
 
+  setup_projects_dir
   setup_ssh
   setup_docker
   setup_chrome
   setup_vscode
+  setup_vscode_extensions
   setup_python
   setup_nodejs
   setup_vlc
