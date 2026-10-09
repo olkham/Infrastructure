@@ -43,6 +43,7 @@ prepare_dirs() {
   local dirs=(
     "$DATA_DIR/agentdvr/config" "$DATA_DIR/agentdvr/media" "$DATA_DIR/node-red"
     "$DATA_DIR/sabnzbd" "$DATA_DIR/sonarr" "$DATA_DIR/radarr" "$DATA_DIR/plex"
+    "$DATA_DIR/pihole/etc-pihole" "$DATA_DIR/pihole/etc-dnsmasq.d"
     "$MEDIA_ROOT/tv" "$MEDIA_ROOT/movies" "$MEDIA_ROOT/downloads"
   )
   mkdir -p "${dirs[@]}"

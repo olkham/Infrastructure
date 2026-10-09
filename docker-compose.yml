@@ -90,6 +90,21 @@ services:
       - ${MEDIA_ROOT:-/srv/media}:/data
     restart: unless-stopped
 
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "80:80"
+    environment:
+      TZ: ${TZ:-Etc/UTC}
+      FTLCONF_webserver_api_password: ${PIHOLE_PASSWORD:-}
+    volumes:
+      - ${DATA_DIR:-./data}/pihole/etc-pihole:/etc/pihole
+      - ${DATA_DIR:-./data}/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+    restart: unless-stopped
+
 configs:
   mosquitto_conf:
     content: |
